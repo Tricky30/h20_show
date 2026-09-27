@@ -186,6 +186,7 @@
         beforeComposerText: getComposerText(composer),
         beforeUserMessageCount: countUserMessages(),
         startedAt: now,
+        startedPerformanceAt: performance.now(),
         confirmed: false
       };
       this.activeAttempt = attempt;
@@ -244,7 +245,12 @@
       attempt.beforeComposerText = "";
 
       try {
-        await this.onConfirmedSubmission({ source: attempt.source, promptText });
+        await this.onConfirmedSubmission({
+          source: attempt.source,
+          promptText,
+          submittedAt: attempt.startedAt,
+          submittedPerformanceAt: attempt.startedPerformanceAt
+        });
       } catch (error) {
         console.error("[H2SHOW] Could not record prompt submission", error);
       }

@@ -34,6 +34,26 @@
     return element;
   }
 
+  function formatDuration(milliseconds) {
+    if (milliseconds < 1000) return `${milliseconds} ms`;
+    return `${(milliseconds / 1000).toFixed(1)} sec`;
+  }
+
+  function responseStatusText(entry) {
+    if (Number.isInteger(entry.response_duration_ms)) {
+      if (entry.response_tracking_state === "error") {
+        return `Error after ${formatDuration(entry.response_duration_ms)}`;
+      }
+      return `Response: ${formatDuration(entry.response_duration_ms)}`;
+    }
+    if (entry.response_tracking_state === "responding") return "Responding…";
+    if (entry.response_tracking_state === "waiting") return "Waiting for response…";
+    if (entry.response_tracking_state === "interrupted") {
+      return "Response timing unavailable";
+    }
+    return "";
+  }
+
   class PromptActivityUI {
     constructor(storage) {
       this.storage = storage;
@@ -220,6 +240,13 @@
             details.append(
               makeElement("span", "h2show-log-measurements", measurementText)
             );
+
+            const responseText = responseStatusText(entry);
+            if (responseText) {
+              details.append(
+                makeElement("span", "h2show-response-status", responseText)
+              );
+            }
 
             row.append(time, details);
             section.append(row);

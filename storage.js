@@ -3,6 +3,18 @@
 
   const LOGS_KEY = "promptLogs";
   const PANEL_EXPANDED_KEY = "panelExpanded";
+  const RESPONSE_TRACKING_STATES = new Set([
+    "waiting",
+    "responding",
+    "completed",
+    "error",
+    "interrupted"
+  ]);
+
+  function isValidOptionalTimestamp(value) {
+    return value === undefined ||
+      (typeof value === "string" && !Number.isNaN(Date.parse(value)));
+  }
 
   function isValidLogEntry(entry) {
     const hasValidIdentity = Boolean(
@@ -16,10 +28,30 @@
 
     // Measurement fields are optional for backward compatibility with logs
     // created before version 0.2.0. When present, they must be whole numbers.
-    return ["character_count", "word_count"].every(
+    const measurementsAreValid = ["character_count", "word_count"].every(
       (field) =>
         entry[field] === undefined ||
         (Number.isInteger(entry[field]) && entry[field] >= 0)
+    );
+
+    const durationIsValid =
+      entry.response_duration_ms === undefined ||
+      (Number.isInteger(entry.response_duration_ms) &&
+        entry.response_duration_ms >= 0);
+    const stateIsValid =
+      entry.response_tracking_state === undefined ||
+      RESPONSE_TRACKING_STATES.has(entry.response_tracking_state);
+    const reasonIsValid =
+      entry.response_tracking_reason === undefined ||
+      typeof entry.response_tracking_reason === "string";
+
+    return Boolean(
+      measurementsAreValid &&
+        durationIsValid &&
+        stateIsValid &&
+        reasonIsValid &&
+        isValidOptionalTimestamp(entry.response_started_at) &&
+        isValidOptionalTimestamp(entry.response_completed_at)
     );
   }
 
@@ -47,6 +79,47 @@
 
     const updatedLogs = [entry, ...logs];
     await chrome.storage.local.set({ [LOGS_KEY]: updatedLogs });
+    return updatedLogs;
+  }
+
+  async function updateLogEntry(id, changes) {
+    const logs = await getLogs();
+    const index = logs.findIndex((entry) => entry.id === id);
+    if (index === -1) return null;
+
+    const updatedEntry = { ...logs[index], ...changes, id: logs[index].id };
+    if (!isValidLogEntry(updatedEntry)) {
+      throw new TypeError("The updated log entry contains invalid fields.");
+    }
+
+    const updatedLogs = [...logs];
+    updatedLogs[index] = updatedEntry;
+    await chrome.storage.local.set({ [LOGS_KEY]: updatedLogs });
+    return updatedEntry;
+  }
+
+  async function interruptStaleResponseTracking() {
+    const logs = await getLogs();
+    let changed = false;
+    const updatedLogs = logs.map((entry) => {
+      if (
+        entry.response_tracking_state !== "waiting" &&
+        entry.response_tracking_state !== "responding"
+      ) {
+        return entry;
+      }
+
+      changed = true;
+      return {
+        ...entry,
+        response_tracking_state: "interrupted",
+        response_tracking_reason: "page-reload"
+      };
+    });
+
+    if (changed) {
+      await chrome.storage.local.set({ [LOGS_KEY]: updatedLogs });
+    }
     return updatedLogs;
   }
 
@@ -85,6 +158,8 @@
     PANEL_EXPANDED_KEY,
     getLogs,
     saveLogEntry,
+    updateLogEntry,
+    interruptStaleResponseTracking,
     getPanelExpanded,
     setPanelExpanded,
     subscribeToLogs

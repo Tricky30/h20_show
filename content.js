@@ -18,28 +18,67 @@
     const { measurePrompt } = globalThis.H2ShowMeasurements;
     const { PromptActivityUI } = globalThis.H2ShowUI;
     const { PromptSubmissionDetector } = globalThis.H2ShowDetector;
+    const { ResponseTracker } = globalThis.H2ShowResponseTracker;
+
+    await storage.interruptStaleResponseTracking();
 
     const ui = new PromptActivityUI(storage);
     await ui.initialize();
 
-    const detector = new PromptSubmissionDetector(async ({ source, promptText }) => {
+    let responseUpdateQueue = Promise.resolve();
+    const updateResponseEvent = (eventId, changes) => {
+      responseUpdateQueue = responseUpdateQueue.then(async () => {
+        const updatedEntry = await storage.updateLogEntry(eventId, changes);
+        if (updatedEntry) {
+          console.info(`[H2SHOW] Event updated: ${eventId}`);
+        }
+      });
+      return responseUpdateQueue;
+    };
+
+    const responseTracker = new ResponseTracker({
+      onStarted: ({ eventId, response_started_at }) =>
+        updateResponseEvent(eventId, {
+          response_started_at,
+          response_tracking_state: "responding"
+        }),
+      onCompleted: ({ eventId, ...responseFields }) =>
+        updateResponseEvent(eventId, responseFields),
+      onInterrupted: ({ eventId, ...responseFields }) =>
+        updateResponseEvent(eventId, responseFields)
+    });
+    responseTracker.start();
+
+    const detector = new PromptSubmissionDetector(async ({
+      source,
+      promptText,
+      submittedAt,
+      submittedPerformanceAt
+    }) => {
       console.info(`[H2SHOW] Prompt detected (${source})`);
 
       const measurements = measurePrompt(promptText);
 
       const entry = {
         id: createUniqueId(),
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(submittedAt).toISOString(),
+        response_tracking_state: "waiting",
         ...measurements
       };
       console.info("[H2SHOW] Timestamp recorded", entry.timestamp);
 
       await storage.saveLogEntry(entry);
       console.info("[H2SHOW] Log entry saved", entry.id);
+
+      responseTracker.track({
+        eventId: entry.id,
+        submittedAt,
+        submittedPerformanceAt
+      });
     });
 
     detector.start();
-    globalThis[INSTANCE_KEY] = { detector, ui };
+    globalThis[INSTANCE_KEY] = { detector, responseTracker, ui };
     console.info("[H2SHOW] Extension initialized");
   }
 

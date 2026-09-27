@@ -1,6 +1,6 @@
 # H2SHOW Prompt Activity
 
-A dependency-free Chrome Extension (Manifest V3) that records the time and basic measurements of each prompt submitted to ChatGPT. Prompt text is never saved. All records and the panel's expanded/collapsed preference remain in `chrome.storage.local` on the user's computer.
+A dependency-free Chrome Extension (Manifest V3) that records prompt measurements and ChatGPT response duration. Prompt text is never saved. All records and the panel's expanded/collapsed preference remain in `chrome.storage.local` on the user's computer.
 
 ## Load the extension
 
@@ -12,28 +12,30 @@ A dependency-free Chrome Extension (Manifest V3) that records the time and basic
 
 After changing extension source files, return to `chrome://extensions`, click the extension's **Reload** button, and refresh ChatGPT.
 
-## End-to-end test checklist
+## V3 response-timing test checklist
 
 1. **Load unpacked:** Follow the loading steps above and confirm **H2SHOW Prompt Activity** appears on `chrome://extensions` without errors.
 2. **Initialization:** Open ChatGPT, press `F12`, select **Console**, and confirm `[H2SHOW] Extension initialized` appears.
-3. **Normal sentence:** Submit `This is a normal sentence.` and confirm the row shows `5 words • 26 characters`.
-4. **One word:** Submit `Hello` and confirm the row shows `1 word • 5 characters`.
-5. **Multi-line:** Type multiple lines with `Shift+Enter`, then submit with `Enter`. Confirm line breaks count as characters and the whitespace-separated words are counted.
-6. **Punctuation:** Submit `Hello, world!` and confirm the row shows `2 words • 13 characters`.
-7. **Very long prompt:** Paste and submit a long prompt, then confirm one row appears with plausible measurements and the page remains responsive.
-8. **Keyboard:** Type a prompt and press `Enter`. Confirm exactly one measured row appears.
-9. **Send button:** Type a prompt and click ChatGPT's send button. Confirm exactly one measured row appears.
-10. **Collapse:** Click the `×` in the H2SHOW panel. Click the small droplet tab at the right edge to reopen it.
-11. **Refresh persistence:** Collapse or expand the panel, refresh ChatGPT, and confirm logs, measurements, and panel preference remain.
-12. **Reopen persistence:** Close the ChatGPT tab, open ChatGPT again, and confirm the saved logs and measurements remain.
-13. **Duplicate protection:** For each submitted prompt, confirm the Console shows one `Prompt detected`, one `Timestamp recorded`, and one `Log entry saved` sequence, and the UI adds exactly one row.
-14. **Local data/privacy:** In the ChatGPT DevTools Console, use the execution-context dropdown near the top of the Console to choose the **H2SHOW Prompt Activity** content-script context, then run:
+3. **Normal short response:** Ask a simple factual question. Confirm the row first shows `Waiting for response…`, then `Responding…`, then a duration such as `Response: 1.8 sec`.
+4. **Long response:** Ask for a long explanation. Confirm `Responding…` remains visible during generation and changes to a duration only after generation stops.
+5. **Response containing code:** Ask ChatGPT for a code example. Confirm dynamic code-block rendering does not create extra log entries or finish timing early.
+6. **Multiple prompts:** Submit several prompts in the same conversation, waiting for each response to finish. Confirm every prompt has one independent row and duration.
+7. **New conversation:** Start a new ChatGPT conversation and submit a prompt. Confirm tracking continues after client-side navigation.
+8. **Manual stop:** Submit a long request and click ChatGPT's stop control. Confirm the original row receives the elapsed duration up to the stop.
+9. **ChatGPT error:** If possible, reproduce a ChatGPT response error. Confirm the row displays `Error after …` when an observable error state appears.
+10. **Collapsed panel:** Collapse H2SHOW while ChatGPT is responding. Confirm it stays collapsed, then reopen it and verify the same row has its completed duration.
+11. **Refresh during generation:** Refresh while ChatGPT is responding. The original event must remain, but it will show `Response timing unavailable` because a page refresh destroys the high-resolution timer. No duration is fabricated.
+12. **Exactly one entry:** Confirm one prompt adds exactly one row. In the Console, there should be one `Log entry saved` message for that prompt.
+13. **Same-entry update:** Note the event ID in the Console. Confirm `Event updated: [same ID]` appears for response state changes and no second prompt row is added.
+14. **Existing V2 entries:** Confirm entries created before V3 still display normally without response status or duration.
+15. **Persistence:** Refresh after a response completes and confirm its duration remains.
+16. **Local data/privacy:** In the ChatGPT DevTools Console, use the execution-context dropdown near the top of the Console to choose the **H2SHOW Prompt Activity** content-script context, then run:
 
    ```js
    chrome.storage.local.get(null).then(console.log)
    ```
 
-   Each new `promptLogs` entry contains only `id`, `timestamp`, `character_count`, and `word_count`. Confirm that no prompt-text field or submitted text appears. `panelExpanded` is stored separately.
+   A completed V3 entry contains prompt metadata plus `response_started_at`, `response_completed_at`, `response_duration_ms`, and `response_tracking_state`. Confirm that no prompt-text field or submitted text appears. `panelExpanded` is stored separately.
 
 ## Files
 
@@ -42,7 +44,8 @@ After changing extension source files, return to `chrome://extensions`, click th
 - `ui.js` — Builds the H2SHOW panel, groups entries by local calendar day, formats local times, manages collapse/reopen behavior, and listens for storage updates.
 - `measurements.js` — Calculates character and word counts from submission-time text and returns metadata only.
 - `detector.js` — Watches delegated click, keyboard, and form-submit events and confirms that ChatGPT actually accepted the submission before reporting it.
-- `content.js` — Initializes the extension, measures confirmed prompts, creates metadata-only records, and connects detection to storage.
+- `response-tracker.js` — Observes ChatGPT generation-state controls, assistant messages, and errors; calculates elapsed response duration with `performance.now()`.
+- `content.js` — Initializes the modules, creates the initial event, and coordinates response-state updates to that same event.
 - `styles.css` — Isolated H2SHOW overlay styling, responsive positioning, and light/dark theme support.
 - `assets/` — Cropped H2SHOW logo artwork used inside ChatGPT.
 - `icons/` — H2SHOW Chrome toolbar and extension-management icons.
@@ -56,3 +59,13 @@ Detection is intentionally two-stage. An event first *arms* a pending attempt; i
 At submission time, the detector keeps the composer text in memory only long enough for confirmation. After confirmation, `measurements.js` counts Unicode code points as characters, including spaces and line breaks. It counts words as non-empty groups separated by whitespace; punctuation attached to a word does not create another word. The detector then clears its in-memory text reference.
 
 `content.js` generates a unique ID and ISO timestamp and combines them with the two numeric measurements. Only that metadata object is passed to storage. The timestamp remains timezone-neutral in storage, while `ui.js` displays it in the user's local time and calendar day.
+
+## How response tracking works
+
+The detector captures both the wall-clock submission time and a high-resolution `performance.now()` reading at the submit event. Once the initial event is saved, `response-tracker.js` observes DOM mutations for ChatGPT's stop-generation control, streaming markers, a newly added assistant message, and response-error elements.
+
+When generation is first observed, the tracker updates the original event with `response_started_at`. When generation controls disappear, it records `response_completed_at` and calculates `response_duration_ms` from the original submission-time performance reading. Very fast responses that never expose a generation control use a mutation-driven quiet-period fallback. Storage updates for one response are serialized so a rapid start/completion sequence cannot overwrite either update.
+
+`response_started_at` is the time the extension first observes generation in the DOM, not a network-level server timestamp. `response_duration_ms` measures from user submission through observed completion and is the primary timing value.
+
+If the user manually stops generation, the observed stop is treated as completion and the elapsed duration is retained. If the user navigates away or a newer prompt supersedes an active tracker, the event is marked interrupted without a fabricated completion timestamp. Refreshing the page destroys `performance.now()` state, so an in-progress event is marked `Response timing unavailable` on the next initialization. Completed events and older V2 events remain intact.
