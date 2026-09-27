@@ -43,6 +43,15 @@
     );
   }
 
+  function isDraftConversationPath(path) {
+    return (
+      path === "/" ||
+      path === "/c" ||
+      path === "/c/new" ||
+      (path.startsWith("/g/") && !path.includes("/c/"))
+    );
+  }
+
   class ResponseTracker {
     constructor({ onStarted, onCompleted, onInterrupted }) {
       this.onStarted = onStarted;
@@ -92,6 +101,7 @@
         submittedAt,
         submittedPerformanceAt,
         conversationPath: location.pathname,
+        allowInitialRouteAssignment: isDraftConversationPath(location.pathname),
         initialAssistantCount: messages.length,
         initialLastAssistant: messages.at(-1) || null,
         initialLastAssistantText: messages.at(-1)?.textContent || "",
@@ -132,12 +142,9 @@
       if (!attempt || attempt.finished) return;
 
       if (location.pathname !== attempt.conversationPath) {
-        const isNewConversationRoute =
-          !attempt.started &&
-          (attempt.conversationPath === "/" ||
-            attempt.conversationPath.startsWith("/g/"));
-        if (isNewConversationRoute) {
+        if (attempt.allowInitialRouteAssignment) {
           attempt.conversationPath = location.pathname;
+          attempt.allowInitialRouteAssignment = false;
         } else {
           this.interruptActive("navigation");
           return;

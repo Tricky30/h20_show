@@ -20,7 +20,7 @@ After changing extension source files, return to `chrome://extensions`, click th
 4. **Long response:** Ask for a long explanation. Confirm `Responding…` remains visible during generation and changes to a duration only after generation stops.
 5. **Response containing code:** Ask ChatGPT for a code example. Confirm dynamic code-block rendering does not create extra log entries or finish timing early.
 6. **Multiple prompts:** Submit several prompts in the same conversation, waiting for each response to finish. Confirm every prompt has one independent row and duration.
-7. **New conversation:** Start a new ChatGPT conversation and submit a prompt. Confirm tracking continues after client-side navigation.
+7. **New conversation:** Start a new ChatGPT conversation and submit a first prompt. Confirm its timing survives ChatGPT assigning the permanent conversation URL. Send a second prompt and verify it works too.
 8. **Manual stop:** Submit a long request and click ChatGPT's stop control. Confirm the original row receives the elapsed duration up to the stop.
 9. **ChatGPT error:** If possible, reproduce a ChatGPT response error. Confirm the row displays `Error after …` when an observable error state appears.
 10. **Collapsed panel:** Collapse H2SHOW while ChatGPT is responding. Confirm it stays collapsed, then reopen it and verify the same row has its completed duration.
