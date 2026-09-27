@@ -62,7 +62,7 @@ At submission time, the detector keeps the composer text in memory only long eno
 
 ## How response tracking works
 
-The detector captures both the wall-clock submission time and a high-resolution `performance.now()` reading at the submit event. As the initial event is being saved, `response-tracker.js` immediately begins observing DOM mutations for ChatGPT's stop-generation control, streaming markers, newly added or changing assistant-message content, and response-error elements.
+The detector captures both the wall-clock submission time and a high-resolution `performance.now()` reading at the submit event. As the initial event is being saved, `response-tracker.js` immediately begins observing DOM mutations for ChatGPT's stop-generation control, streaming markers, newly added or changing assistant-message content, and response-error elements. ChatGPT may assign a new conversation URL through several immediate route transitions, so those transitions are accepted during a short five-second assignment window; later navigation is treated as leaving the tracked conversation.
 
 When generation is first observed, the tracker updates the original event with `response_started_at`. When generation controls disappear, it records `response_completed_at` and calculates `response_duration_ms` from the original submission-time performance reading. Very fast responses that never expose a generation control use a mutation-driven quiet-period fallback. Storage updates for one response are serialized so a rapid start/completion sequence cannot overwrite either update.
 

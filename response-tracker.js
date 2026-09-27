@@ -24,6 +24,7 @@
     "[data-testid*='message-error']"
   ];
   const FALLBACK_QUIET_MS = 800;
+  const ROUTE_ASSIGNMENT_GRACE_MS = 5000;
 
   function findFirst(selectors) {
     for (const selector of selectors) {
@@ -40,15 +41,6 @@
   function errorElements() {
     return ERROR_SELECTORS.flatMap((selector) =>
       Array.from(document.querySelectorAll(selector))
-    );
-  }
-
-  function isDraftConversationPath(path) {
-    return (
-      path === "/" ||
-      path === "/c" ||
-      path === "/c/new" ||
-      (path.startsWith("/g/") && !path.includes("/c/"))
     );
   }
 
@@ -107,7 +99,8 @@
         submittedAt,
         submittedPerformanceAt,
         conversationPath: location.pathname,
-        allowInitialRouteAssignment: isDraftConversationPath(location.pathname),
+        routeAssignmentDeadline:
+          performance.now() + ROUTE_ASSIGNMENT_GRACE_MS,
         initialAssistantCount: resumed
           ? Math.max(0, messages.length - 1)
           : messages.length,
@@ -153,9 +146,15 @@
       if (!attempt || attempt.finished) return;
 
       if (location.pathname !== attempt.conversationPath) {
-        if (attempt.allowInitialRouteAssignment) {
+        if (performance.now() <= attempt.routeAssignmentDeadline) {
+          console.info(
+            `[H2SHOW] Conversation route assigned: ${attempt.conversationPath} → ${location.pathname}`
+          );
           attempt.conversationPath = location.pathname;
-          attempt.allowInitialRouteAssignment = false;
+          // Route assignment can involve more than one transition. Wait for
+          // the next DOM mutation before reading generation state on the new
+          // conversation document.
+          return;
         } else {
           this.interruptActive("navigation");
           return;
