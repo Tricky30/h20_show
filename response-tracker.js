@@ -4,13 +4,18 @@
   const STOP_BUTTON_SELECTORS = [
     "button[data-testid='stop-button']",
     "button[data-testid='composer-stop-button']",
+    "button[data-testid*='stop']",
+    "form button[aria-label*='Stop' i]",
     "button[aria-label*='Stop generating' i]",
-    "button[aria-label*='Stop responding' i]"
+    "button[aria-label*='Stop responding' i]",
+    "button[aria-label*='Stop streaming' i]",
+    "button[title*='Stop' i]"
   ];
   const ASSISTANT_MESSAGE_SELECTOR = "[data-message-author-role='assistant']";
   const STREAMING_SELECTORS = [
     "[data-message-streaming='true']",
     "[data-is-streaming='true']",
+    "[data-testid*='streaming']",
     ".result-streaming"
   ];
   const ERROR_SELECTORS = [
@@ -61,7 +66,7 @@
         characterData: true,
         subtree: true,
         attributes: true,
-        attributeFilter: ["aria-label", "data-testid", "disabled"]
+        attributeFilter: ["aria-label", "class", "data-testid", "disabled"]
       });
       window.addEventListener("pagehide", this.handlePageHide);
     }
@@ -89,6 +94,7 @@
         conversationPath: location.pathname,
         initialAssistantCount: messages.length,
         initialLastAssistant: messages.at(-1) || null,
+        initialLastAssistantText: messages.at(-1)?.textContent || "",
         initialErrorCount: errors.length,
         initialLastError: errors.at(-1) || null,
         started: false,
@@ -148,13 +154,19 @@
       const assistantAppeared =
         messages.length > attempt.initialAssistantCount ||
         (lastAssistant && lastAssistant !== attempt.initialLastAssistant);
+      const assistantContentChanged = Boolean(
+        lastAssistant &&
+          lastAssistant === attempt.initialLastAssistant &&
+          (lastAssistant.textContent || "") !== attempt.initialLastAssistantText
+      );
+      const assistantActivity = assistantAppeared || assistantContentChanged;
       const errors = errorElements();
       const lastError = errors.at(-1) || null;
       const errorAppeared =
         errors.length > attempt.initialErrorCount ||
         (lastError && lastError !== attempt.initialLastError);
 
-      if (!attempt.started && (generationActive || assistantAppeared)) {
+      if (!attempt.started && (generationActive || assistantActivity)) {
         attempt.started = true;
         const detectedPerformanceAt = performance.now();
         const responseStartedAt = this.wallClockIso(
@@ -183,7 +195,7 @@
         this.completeActive(errorAppeared ? "error" : "completed");
       } else if (
         attempt.started &&
-        assistantAppeared &&
+        assistantActivity &&
         !generationActive &&
         !attempt.sawGenerationControl
       ) {

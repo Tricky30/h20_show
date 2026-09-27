@@ -27,12 +27,16 @@
 
     let responseUpdateQueue = Promise.resolve();
     const updateResponseEvent = (eventId, changes) => {
-      responseUpdateQueue = responseUpdateQueue.then(async () => {
-        const updatedEntry = await storage.updateLogEntry(eventId, changes);
-        if (updatedEntry) {
-          console.info(`[H2SHOW] Event updated: ${eventId}`);
-        }
-      });
+      responseUpdateQueue = responseUpdateQueue
+        .catch((error) => {
+          console.error("[H2SHOW] Previous response update failed", error);
+        })
+        .then(async () => {
+          const updatedEntry = await storage.updateLogEntry(eventId, changes);
+          if (updatedEntry) {
+            console.info(`[H2SHOW] Event updated: ${eventId}`);
+          }
+        });
       return responseUpdateQueue;
     };
 
@@ -67,14 +71,18 @@
       };
       console.info("[H2SHOW] Timestamp recorded", entry.timestamp);
 
-      await storage.saveLogEntry(entry);
-      console.info("[H2SHOW] Log entry saved", entry.id);
-
+      // Start observing immediately. Response-state writes are queued behind
+      // this save so very short responses cannot update a missing record.
+      const savePromise = storage.saveLogEntry(entry);
+      responseUpdateQueue = responseUpdateQueue.then(() => savePromise);
       responseTracker.track({
         eventId: entry.id,
         submittedAt,
         submittedPerformanceAt
       });
+
+      await savePromise;
+      console.info("[H2SHOW] Log entry saved", entry.id);
     });
 
     detector.start();
