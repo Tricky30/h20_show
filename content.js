@@ -20,7 +20,7 @@
     const { PromptSubmissionDetector } = globalThis.H2ShowDetector;
     const { ResponseTracker } = globalThis.H2ShowResponseTracker;
 
-    await storage.interruptStaleResponseTracking();
+    const recoveryEntry = await storage.prepareResponseTrackingRecovery();
 
     const ui = new PromptActivityUI(storage);
     await ui.initialize();
@@ -52,6 +52,18 @@
         updateResponseEvent(eventId, responseFields)
     });
     responseTracker.start();
+
+    if (recoveryEntry) {
+      const submittedAt = Date.parse(recoveryEntry.timestamp);
+      const elapsedSinceSubmission = Math.max(0, Date.now() - submittedAt);
+      responseTracker.track({
+        eventId: recoveryEntry.id,
+        submittedAt,
+        submittedPerformanceAt: performance.now() - elapsedSinceSubmission,
+        responseStartedAt: recoveryEntry.response_started_at || null,
+        resumed: true
+      });
+    }
 
     const detector = new PromptSubmissionDetector(async ({
       source,

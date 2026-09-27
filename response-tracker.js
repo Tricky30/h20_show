@@ -89,7 +89,13 @@
       this.checkScheduled = false;
     }
 
-    track({ eventId, submittedAt, submittedPerformanceAt }) {
+    track({
+      eventId,
+      submittedAt,
+      submittedPerformanceAt,
+      responseStartedAt = null,
+      resumed = false
+    }) {
       if (this.active && !this.active.finished) {
         this.interruptActive("superseded");
       }
@@ -102,17 +108,22 @@
         submittedPerformanceAt,
         conversationPath: location.pathname,
         allowInitialRouteAssignment: isDraftConversationPath(location.pathname),
-        initialAssistantCount: messages.length,
-        initialLastAssistant: messages.at(-1) || null,
-        initialLastAssistantText: messages.at(-1)?.textContent || "",
+        initialAssistantCount: resumed
+          ? Math.max(0, messages.length - 1)
+          : messages.length,
+        initialLastAssistant: resumed ? null : messages.at(-1) || null,
+        initialLastAssistantText: resumed
+          ? ""
+          : messages.at(-1)?.textContent || "",
         initialErrorCount: errors.length,
         initialLastError: errors.at(-1) || null,
-        started: false,
+        started: Boolean(responseStartedAt),
         sawGenerationControl: false,
         finished: false
       };
 
-      console.info(`[H2SHOW] Response tracking started for event: ${eventId}`);
+      const action = resumed ? "resumed" : "started";
+      console.info(`[H2SHOW] Response tracking ${action} for event: ${eventId}`);
       this.scheduleCheck();
     }
 
@@ -280,6 +291,9 @@
       attempt.finished = true;
       this.clearFallbackTimer();
       this.active = null;
+      console.info(
+        `[H2SHOW] Response tracking interrupted (${reason}) for event: ${attempt.eventId}`
+      );
       Promise.resolve(
         this.onInterrupted({
           eventId: attempt.eventId,

@@ -24,7 +24,7 @@ After changing extension source files, return to `chrome://extensions`, click th
 8. **Manual stop:** Submit a long request and click ChatGPT's stop control. Confirm the original row receives the elapsed duration up to the stop.
 9. **ChatGPT error:** If possible, reproduce a ChatGPT response error. Confirm the row displays `Error after …` when an observable error state appears.
 10. **Collapsed panel:** Collapse H2SHOW while ChatGPT is responding. Confirm it stays collapsed, then reopen it and verify the same row has its completed duration.
-11. **Refresh during generation:** Refresh while ChatGPT is responding. The original event must remain, but it will show `Response timing unavailable` because a page refresh destroys the high-resolution timer. No duration is fabricated.
+11. **Refresh during generation:** Refresh while ChatGPT is responding. Confirm the newest recent event resumes tracking and updates the same row. The elapsed pre-refresh time is reconstructed from its submission timestamp.
 12. **Exactly one entry:** Confirm one prompt adds exactly one row. In the Console, there should be one `Log entry saved` message for that prompt.
 13. **Same-entry update:** Note the event ID in the Console. Confirm `Event updated: [same ID]` appears for response state changes and no second prompt row is added.
 14. **Existing V2 entries:** Confirm entries created before V3 still display normally without response status or duration.
@@ -68,4 +68,4 @@ When generation is first observed, the tracker updates the original event with `
 
 `response_started_at` is the time the extension first observes generation in the DOM, not a network-level server timestamp. `response_duration_ms` measures from user submission through observed completion and is the primary timing value.
 
-If the user manually stops generation, the observed stop is treated as completion and the elapsed duration is retained. If the user navigates away or a newer prompt supersedes an active tracker, the event is marked interrupted without a fabricated completion timestamp. Refreshing the page destroys `performance.now()` state, so an in-progress event is marked `Response timing unavailable` on the next initialization. Completed events and older V2 events remain intact.
+If the user manually stops generation, the observed stop is treated as completion and the elapsed duration is retained. If the user navigates away or a newer prompt supersedes an active tracker, the event is marked interrupted without a fabricated completion timestamp. After a page-context replacement or refresh, the newest pending event from the last ten minutes is resumed. Its pre-refresh elapsed time is reconstructed from the persistent submission timestamp, then high-resolution timing continues in the new page context. Older pending events are marked interrupted; completed events and V2 entries remain intact.

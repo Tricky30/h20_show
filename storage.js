@@ -98,14 +98,22 @@
     return updatedEntry;
   }
 
-  async function interruptStaleResponseTracking() {
+  async function prepareResponseTrackingRecovery(maxAgeMs = 10 * 60 * 1000) {
     const logs = await getLogs();
+    const now = Date.now();
+    let recoverableEntry = null;
     let changed = false;
     const updatedLogs = logs.map((entry) => {
       if (
         entry.response_tracking_state !== "waiting" &&
         entry.response_tracking_state !== "responding"
       ) {
+        return entry;
+      }
+
+      const age = now - Date.parse(entry.timestamp);
+      if (!recoverableEntry && age >= 0 && age <= maxAgeMs) {
+        recoverableEntry = entry;
         return entry;
       }
 
@@ -120,7 +128,7 @@
     if (changed) {
       await chrome.storage.local.set({ [LOGS_KEY]: updatedLogs });
     }
-    return updatedLogs;
+    return recoverableEntry;
   }
 
   async function getPanelExpanded() {
@@ -159,7 +167,7 @@
     getLogs,
     saveLogEntry,
     updateLogEntry,
-    interruptStaleResponseTracking,
+    prepareResponseTrackingRecovery,
     getPanelExpanded,
     setPanelExpanded,
     subscribeToLogs
