@@ -176,11 +176,22 @@
 
 .h2show-response-status {
   display: block;
-  margin-top: 3px;
+  margin-top: 1px;
   color: var(--h2show-blue);
   font-size: 11px;
   font-weight: 700;
   line-height: 1.3;
+}
+
+.h2show-response-details {
+  margin-top: 6px;
+}
+
+.h2show-response-label {
+  display: block;
+  color: var(--h2show-text);
+  font-size: 12px;
+  font-weight: 650;
 }
 
 .h2show-empty {

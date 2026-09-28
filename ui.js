@@ -39,12 +39,12 @@
     return `${(milliseconds / 1000).toFixed(1)} sec`;
   }
 
-  function responseStatusText(entry) {
+  function responseTimingText(entry) {
     if (Number.isInteger(entry.response_duration_ms)) {
       if (entry.response_tracking_state === "error") {
         return `Error after ${formatDuration(entry.response_duration_ms)}`;
       }
-      return `Response: ${formatDuration(entry.response_duration_ms)}`;
+      return formatDuration(entry.response_duration_ms);
     }
     if (entry.response_tracking_state === "responding") return "Responding…";
     if (entry.response_tracking_state === "waiting") return "Waiting for response…";
@@ -52,6 +52,10 @@
       return "Response timing unavailable";
     }
     return "";
+  }
+
+  function measurementText(wordCount, characterCount) {
+    return `${wordCount} ${wordCount === 1 ? "word" : "words"} • ${characterCount.toLocaleString()} chars`;
   }
 
   class PromptActivityUI {
@@ -234,18 +238,58 @@
             const hasMeasurements =
               Number.isInteger(entry.word_count) &&
               Number.isInteger(entry.character_count);
-            const measurementText = hasMeasurements
-              ? `${entry.word_count} ${entry.word_count === 1 ? "word" : "words"} • ${entry.character_count} ${entry.character_count === 1 ? "character" : "characters"}`
+            const promptMeasurementText = hasMeasurements
+              ? measurementText(entry.word_count, entry.character_count)
               : "Measurements unavailable";
             details.append(
-              makeElement("span", "h2show-log-measurements", measurementText)
+              makeElement(
+                "span",
+                "h2show-log-measurements",
+                promptMeasurementText
+              )
             );
 
-            const responseText = responseStatusText(entry);
-            if (responseText) {
-              details.append(
-                makeElement("span", "h2show-response-status", responseText)
+            const hasResponseMeasurements =
+              Number.isInteger(entry.response_word_count) &&
+              Number.isInteger(entry.response_character_count);
+            const responseTiming = responseTimingText(entry);
+            const hasResponseSection =
+              hasResponseMeasurements ||
+              Boolean(responseTiming) ||
+              typeof entry.response_tracking_state === "string";
+
+            if (hasResponseSection) {
+              const responseDetails = makeElement(
+                "div",
+                "h2show-response-details"
               );
+              details.append(
+                responseDetails
+              );
+              responseDetails.append(
+                makeElement("span", "h2show-response-label", "Response")
+              );
+              if (hasResponseMeasurements) {
+                responseDetails.append(
+                  makeElement(
+                    "span",
+                    "h2show-log-measurements",
+                    measurementText(
+                      entry.response_word_count,
+                      entry.response_character_count
+                    )
+                  )
+                );
+              }
+              if (responseTiming) {
+                responseDetails.append(
+                  makeElement(
+                    "span",
+                    "h2show-response-status",
+                    responseTiming
+                  )
+                );
+              }
             }
 
             row.append(time, details);

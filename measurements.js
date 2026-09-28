@@ -2,14 +2,14 @@
   "use strict";
 
   /**
-   * Measures prompt text without retaining it.
+   * Measures text without retaining it.
    *
    * Characters are counted as Unicode code points, including spaces and line
    * breaks. Words are non-empty groups separated by whitespace, so punctuation
    * attached to a word remains part of that word.
    */
-  function measurePrompt(promptText) {
-    const text = typeof promptText === "string" ? promptText : "";
+  function measureText(inputText) {
+    const text = typeof inputText === "string" ? inputText : "";
     const trimmedText = text.trim();
 
     return Object.freeze({
@@ -18,5 +18,9 @@
     });
   }
 
-  globalThis.H2ShowMeasurements = Object.freeze({ measurePrompt });
+  function measurePrompt(promptText) {
+    return measureText(promptText);
+  }
+
+  globalThis.H2ShowMeasurements = Object.freeze({ measureText, measurePrompt });
 })();

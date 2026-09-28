@@ -15,7 +15,8 @@
     if (globalThis[INSTANCE_KEY]) return;
 
     const storage = globalThis.H2ShowStorage;
-    const { measurePrompt } = globalThis.H2ShowMeasurements;
+    const { measureText, measurePrompt } = globalThis.H2ShowMeasurements;
+    const { extractResponseText } = globalThis.H2ShowResponseExtractor;
     const { PromptActivityUI } = globalThis.H2ShowUI;
     const { PromptSubmissionDetector } = globalThis.H2ShowDetector;
     const { ResponseTracker } = globalThis.H2ShowResponseTracker;
@@ -46,8 +47,37 @@
           response_started_at,
           response_tracking_state: "responding"
         }),
-      onCompleted: ({ eventId, ...responseFields }) =>
-        updateResponseEvent(eventId, responseFields),
+      onCompleted: async ({ eventId, responseElement, ...responseFields }) => {
+        const fieldsToStore = { ...responseFields };
+
+        if (responseElement) {
+          console.info(`[H2SHOW] Response identified for event: ${eventId}`);
+          let responseText = extractResponseText(responseElement);
+          if (responseText) {
+            const measurements = measureText(responseText);
+            responseText = "";
+
+            fieldsToStore.response_character_count =
+              measurements.character_count;
+            fieldsToStore.response_word_count = measurements.word_count;
+
+            console.info("[H2SHOW] Response measurements calculated");
+            console.info(
+              `[H2SHOW] Response characters: ${measurements.character_count}`
+            );
+            console.info(`[H2SHOW] Response words: ${measurements.word_count}`);
+          } else {
+            console.warn("[H2SHOW] Response text extraction was empty");
+          }
+        }
+
+        await updateResponseEvent(eventId, fieldsToStore);
+        if (responseElement) {
+          console.info(
+            `[H2SHOW] Event updated with response measurements: ${eventId}`
+          );
+        }
+      },
       onInterrupted: ({ eventId, ...responseFields }) =>
         updateResponseEvent(eventId, responseFields)
     });
