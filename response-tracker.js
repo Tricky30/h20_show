@@ -108,6 +108,7 @@
         initialLastAssistantText: resumed
           ? ""
           : messages.at(-1)?.textContent || "",
+        responseElement: resumed ? messages.at(-1) || null : null,
         initialErrorCount: errors.length,
         initialLastError: errors.at(-1) || null,
         started: Boolean(responseStartedAt),
@@ -177,6 +178,9 @@
           (lastAssistant.textContent || "") !== attempt.initialLastAssistantText
       );
       const assistantActivity = assistantAppeared || assistantContentChanged;
+      if (assistantActivity && lastAssistant) {
+        attempt.responseElement = lastAssistant;
+      }
       const errors = errorElements();
       const lastError = errors.at(-1) || null;
       const errorAppeared =
@@ -276,7 +280,9 @@
           eventId: attempt.eventId,
           response_completed_at: responseCompletedAt,
           response_duration_ms: duration,
-          response_tracking_state: state
+          response_tracking_state: state,
+          responseElement:
+            attempt.responseElement || assistantMessages().at(-1) || null
         })
       ).catch((error) => {
         console.error("[H2SHOW] Could not save response completion", error);

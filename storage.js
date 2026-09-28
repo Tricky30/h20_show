@@ -28,7 +28,12 @@
 
     // Measurement fields are optional for backward compatibility with logs
     // created before version 0.2.0. When present, they must be whole numbers.
-    const measurementsAreValid = ["character_count", "word_count"].every(
+    const measurementsAreValid = [
+      "character_count",
+      "word_count",
+      "response_character_count",
+      "response_word_count"
+    ].every(
       (field) =>
         entry[field] === undefined ||
         (Number.isInteger(entry[field]) && entry[field] >= 0)

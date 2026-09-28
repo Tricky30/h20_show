@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "H2SHOW Prompt Activity",
-  "version": "0.3.4",
-  "description": "Locally records ChatGPT prompt activity and response duration in an on-page activity log.",
+  "version": "0.4.2",
+  "description": "Locally records ChatGPT prompt and response measurements in an on-page activity log.",
   "permissions": [
     "storage"
   ],
@@ -30,6 +30,7 @@
         "ui.js",
         "measurements.js",
         "detector.js",
+        "response-extractor.js",
         "response-tracker.js",
         "content.js"
       ],
