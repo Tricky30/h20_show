@@ -1,6 +1,6 @@
 # H2SHOW Prompt Activity
 
-A dependency-free Chrome Extension (Manifest V3) that records prompt and response measurements plus ChatGPT response duration. Prompt and response text are never saved. All records and the panel's expanded/collapsed preference remain in `chrome.storage.local` on the user's computer.
+A dependency-free Chrome Extension (Manifest V3) that records prompt, attachment, and response metadata plus ChatGPT response duration. Prompt text, response text, filenames, and file contents are never saved. All records and the panel's expanded/collapsed preference remain in `chrome.storage.local` on the user's computer.
 
 ## Load the extension
 
@@ -11,6 +11,39 @@ A dependency-free Chrome Extension (Manifest V3) that records prompt and respons
 5. Open or refresh `https://chatgpt.com/`.
 
 After changing extension source files, return to `chrome://extensions`, click the extension's **Reload** button, and refresh ChatGPT.
+
+## V4.1 attachment test checklist
+
+After reloading the extension, close existing ChatGPT tabs and open a fresh one. This prevents Chrome's expected `Extension context invalidated` error after an unpacked extension reload.
+
+1. **Text only:** Send a normal prompt without a file. Confirm the row has no attachment indicator and storage contains `attachment_count: 0` with `attachments: []`.
+2. **One image:** Attach a JPG or PNG, add text, and submit. Confirm the row shows `📎 1 attachment`.
+3. **Multiple images:** Attach two images and submit. Confirm the row shows `📎 2 attachments` and storage contains two metadata objects.
+4. **PDF:** Attach a PDF. Confirm its category is `document`, its extension is `pdf`, and browser-provided size/MIME metadata appears when available.
+5. **Another document:** Test a supported DOCX or TXT file and confirm the general `document` category.
+6. **Data file:** If ChatGPT accepts it, attach CSV or XLSX and confirm the category is `data`.
+7. **Attachment plus text:** Confirm prompt word/character measurements and the attachment indicator both appear on the same row.
+8. **Several prompts:** Send multiple prompts where only one has a file. Confirm only that prompt row displays an attachment indicator.
+9. **Remove before sending:** Select a file, remove it using ChatGPT's attachment-removal control, then submit. Confirm it is not associated with the event.
+10. **Attachment-only prompt:** If ChatGPT permits it, send an attachment with no text. Confirm a prompt event is created with zero text measurements and the correct attachment count.
+11. **Association:** Compare event IDs in the Console and stored records; each attachment must belong to the prompt that submitted it.
+12. **Metadata accuracy:** Compare `extension`, `mime_type`, and `size_bytes` with the original file's browser/operating-system properties.
+13. **Missing metadata:** For a file whose MIME type or extension is unavailable, confirm the field is omitted rather than invented and the category falls back to `other` when necessary.
+14. **Image dimensions:** Compare stored `width` and `height` with the original image's pixel dimensions. If Chrome cannot decode the image, confirm those fields are omitted.
+15. **Privacy:** Confirm no attachment content, image data, document text, prompt text, or response text exists in storage or H2SHOW Console messages.
+16. **Filename privacy:** Confirm the original filename does not appear in the stored event.
+17. **Older records:** Confirm existing V1–V4 rows still render normally without attachment indicators.
+18. **V3 regression:** Confirm response timing still transitions from waiting/responding to a final duration.
+19. **V4 regression:** Confirm completed responses still receive word and character measurements.
+20. **Persistence:** Refresh and reopen ChatGPT. Confirm the attachment count and metadata remain on the same event.
+
+To inspect all local records, open ChatGPT DevTools, choose the **H2SHOW Prompt Activity** execution context in the Console context dropdown, and run:
+
+```js
+chrome.storage.local.get("promptLogs").then(console.log)
+```
+
+An attachment-bearing event contains `attachment_count` and an `attachments` array. Each array item contains only observed metadata: `category`, optional `extension`, optional `mime_type`, optional `size_bytes`, and optional image `width`/`height`. There must be no filename or content field.
 
 ## V4 response-measurement test checklist
 
@@ -48,6 +81,7 @@ To manually check a response count, copy only the visible assistant answer into 
 - `storage.js` — The only module that reads or writes `chrome.storage.local`. It validates, sorts, and saves log entries and panel preference.
 - `ui.js` — Builds the H2SHOW panel, groups entries by local calendar day, formats local times, manages collapse/reopen behavior, and listens for storage updates.
 - `measurements.js` — Shared, text-source-agnostic character and word counting. It returns numeric metadata only.
+- `attachments.js` — Captures browser `File` objects in memory, classifies general attachment type, extracts reliable metadata, tracks removal, and produces filename-free metadata for the submitted event.
 - `detector.js` — Watches delegated click, keyboard, and form-submit events and confirms that ChatGPT actually accepted the submission before reporting it.
 - `response-extractor.js` — Extracts visible answer content from the matched assistant-message subtree while excluding buttons, toolbars, scripts, icons, and other controls.
 - `response-tracker.js` — Observes ChatGPT generation-state controls, assistant messages, and errors; calculates elapsed response duration and associates the matching assistant-message element with the original event.
@@ -83,3 +117,13 @@ The response tracker retains the DOM element for the assistant message associate
 `content.js` passes the extracted string directly to the shared `measureText` function. Character count uses Unicode code points and includes spaces and line breaks in the normalized extracted answer. Word count uses non-empty whitespace-separated groups; punctuation attached to a group remains part of the same word. Immediately after measurement, the temporary text variable is cleared, and only `response_character_count` and `response_word_count` are sent to storage alongside the existing timing fields.
 
 The original prompt event is updated by ID; response measurement never creates a second event. If extraction cannot find answer text, the extension keeps any valid timing state but does not invent zero measurements. Older event versions remain valid because all response measurement fields are optional.
+
+## How attachment tracking works
+
+`attachments.js` listens for file-input changes, file drops, and pasted files without cancelling or modifying those events. When Chrome provides a `File`, the module reads only its browser-supplied name, MIME type, and byte size in memory. The name is used temporarily to obtain a lowercase extension and to recognize ChatGPT's remove-attachment control; the full filename is never returned to `content.js` or storage.
+
+The category rules are centralized: common image types become `image`, common documents become `document`, spreadsheet/delimited formats become `data`, and uncertain types become `other`. MIME type and extension are stored only when the browser/file supplies them. File size comes directly from `File.size`. No missing field is guessed.
+
+For an image, `createImageBitmap` locally decodes the browser `File` long enough to read its intrinsic pixel width and height, then immediately closes the bitmap. The image is not uploaded elsewhere, retained, analyzed, OCR'd, or converted. If decoding fails, dimensions are omitted.
+
+When send is activated, the detector snapshots the currently pending attachment records at the same moment it snapshots prompt text. If submission is confirmed, only that snapshot is consumed and associated with the new event ID. Metadata resolution runs asynchronously so image decoding cannot delay response timing. Selecting and removing an attachment before submission removes it from the pending set. After confirmation, the same event is updated with `attachment_count` and the metadata array; no additional prompt event is created.

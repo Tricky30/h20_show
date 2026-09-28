@@ -49,15 +49,72 @@
     const reasonIsValid =
       entry.response_tracking_reason === undefined ||
       typeof entry.response_tracking_reason === "string";
+    const attachmentsAreAbsent =
+      entry.attachment_count === undefined && entry.attachments === undefined;
+    const attachmentsAreValid =
+      attachmentsAreAbsent ||
+      (Number.isInteger(entry.attachment_count) &&
+        entry.attachment_count >= 0 &&
+        Array.isArray(entry.attachments) &&
+        entry.attachment_count === entry.attachments.length &&
+        entry.attachments.every(isValidAttachment));
 
     return Boolean(
       measurementsAreValid &&
+        attachmentsAreValid &&
         durationIsValid &&
         stateIsValid &&
         reasonIsValid &&
         isValidOptionalTimestamp(entry.response_started_at) &&
         isValidOptionalTimestamp(entry.response_completed_at)
     );
+  }
+
+  function isValidAttachment(attachment) {
+    if (!attachment || typeof attachment !== "object") return false;
+    const allowedFields = new Set([
+      "category",
+      "extension",
+      "mime_type",
+      "size_bytes",
+      "width",
+      "height"
+    ]);
+    if (Object.keys(attachment).some((field) => !allowedFields.has(field))) {
+      return false;
+    }
+    if (!["image", "document", "data", "other"].includes(attachment.category)) {
+      return false;
+    }
+    if (
+      attachment.extension !== undefined &&
+      (typeof attachment.extension !== "string" ||
+        !/^[a-z0-9]{1,16}$/.test(attachment.extension))
+    ) {
+      return false;
+    }
+    if (
+      attachment.mime_type !== undefined &&
+      (typeof attachment.mime_type !== "string" || !attachment.mime_type)
+    ) {
+      return false;
+    }
+    for (const field of ["size_bytes", "width", "height"]) {
+      if (
+        attachment[field] !== undefined &&
+        (!Number.isInteger(attachment[field]) || attachment[field] < 0)
+      ) {
+        return false;
+      }
+    }
+    if (attachment.width === 0 || attachment.height === 0) return false;
+    if (
+      attachment.category !== "image" &&
+      (attachment.width !== undefined || attachment.height !== undefined)
+    ) {
+      return false;
+    }
+    return true;
   }
 
   async function getLogs() {

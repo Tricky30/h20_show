@@ -16,6 +16,7 @@
 
     const storage = globalThis.H2ShowStorage;
     const { measureText, measurePrompt } = globalThis.H2ShowMeasurements;
+    const { AttachmentTracker } = globalThis.H2ShowAttachments;
     const { extractResponseText, findLatestResponseElement } =
       globalThis.H2ShowResponseExtractor;
     const { PromptActivityUI } = globalThis.H2ShowUI;
@@ -106,6 +107,8 @@
         updateResponseEvent(eventId, responseFields)
     });
     responseTracker.start();
+    const attachmentTracker = new AttachmentTracker();
+    attachmentTracker.start();
 
     if (recoveryEntry) {
       const submittedAt = Date.parse(recoveryEntry.timestamp);
@@ -123,16 +126,22 @@
       source,
       promptText,
       submittedAt,
-      submittedPerformanceAt
+      submittedPerformanceAt,
+      submissionContext
     }) => {
       console.info(`[H2SHOW] Prompt detected (${source})`);
 
       const measurements = measurePrompt(promptText);
+      const attachmentsPromise = attachmentTracker.consumeSubmissionSnapshot(
+        submissionContext
+      );
 
       const entry = {
         id: createUniqueId(),
         timestamp: new Date(submittedAt).toISOString(),
         response_tracking_state: "waiting",
+        attachment_count: 0,
+        attachments: [],
         ...measurements
       };
       console.info("[H2SHOW] Timestamp recorded", entry.timestamp);
@@ -149,10 +158,23 @@
 
       await savePromise;
       console.info("[H2SHOW] Log entry saved", entry.id);
-    });
+      const attachments = await attachmentsPromise;
+      await updateResponseEvent(entry.id, {
+        attachment_count: attachments.length,
+        attachments
+      });
+      console.info(
+        `[H2SHOW] Attachment metadata associated with event: ${entry.id}`
+      );
+    }, () => attachmentTracker.captureSubmissionSnapshot());
 
     detector.start();
-    globalThis[INSTANCE_KEY] = { detector, responseTracker, ui };
+    globalThis[INSTANCE_KEY] = {
+      detector,
+      responseTracker,
+      attachmentTracker,
+      ui
+    };
     console.info("[H2SHOW] Extension initialized");
   }
 

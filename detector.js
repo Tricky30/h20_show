@@ -99,8 +99,9 @@
   }
 
   class PromptSubmissionDetector {
-    constructor(onConfirmedSubmission) {
+    constructor(onConfirmedSubmission, captureSubmissionContext = null) {
       this.onConfirmedSubmission = onConfirmedSubmission;
+      this.captureSubmissionContext = captureSubmissionContext;
       this.activeAttempt = null;
       this.lastConfirmedAt = 0;
       this.timeoutIds = new Set();
@@ -173,9 +174,14 @@
       const composer = eventTarget ? findComposerNear(eventTarget) : findComposer();
       const sendButton = findSendButton();
       const hadText = composerHasText(composer);
+      const submissionContext = this.captureSubmissionContext?.() || null;
+      const hadAttachments = Boolean(submissionContext?.records?.length);
 
       // An enabled send button also covers prompts containing attachments only.
-      if (!composer || (!hadText && !buttonIsEnabled(sendButton))) {
+      if (
+        !composer ||
+        (!hadText && !hadAttachments && !buttonIsEnabled(sendButton))
+      ) {
         return;
       }
 
@@ -183,10 +189,12 @@
         source,
         composer,
         hadText,
+        hadAttachments,
         beforeComposerText: getComposerText(composer),
         beforeUserMessageCount: countUserMessages(),
         startedAt: now,
         startedPerformanceAt: performance.now(),
+        submissionContext,
         confirmed: false
       };
       this.activeAttempt = attempt;
@@ -215,12 +223,15 @@
       const composerTextChanged =
         attempt.hadText && currentComposerText !== attempt.beforeComposerText;
       const responseStarted = Boolean(findFirst(STOP_BUTTON_SELECTORS));
+      const attachmentSubmissionStarted =
+        attempt.hadAttachments && responseStarted;
 
       // A new user message is the strongest signal. Composer clearing is the
       // fallback ChatGPT signal for current and virtualized ChatGPT screens.
       if (
         userMessageAppeared ||
         composerWasCleared ||
+        attachmentSubmissionStarted ||
         (responseStarted && composerTextChanged)
       ) {
         this.confirm(attempt);
@@ -249,7 +260,8 @@
           source: attempt.source,
           promptText,
           submittedAt: attempt.startedAt,
-          submittedPerformanceAt: attempt.startedPerformanceAt
+          submittedPerformanceAt: attempt.startedPerformanceAt,
+          submissionContext: attempt.submissionContext
         });
       } catch (error) {
         console.error("[H2SHOW] Could not record prompt submission", error);

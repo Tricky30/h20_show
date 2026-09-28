@@ -249,6 +249,21 @@
               )
             );
 
+            if (
+              Number.isInteger(entry.attachment_count) &&
+              entry.attachment_count > 0
+            ) {
+              const attachmentNoun =
+                entry.attachment_count === 1 ? "attachment" : "attachments";
+              details.append(
+                makeElement(
+                  "span",
+                  "h2show-attachment-count",
+                  `📎 ${entry.attachment_count} ${attachmentNoun}`
+                )
+              );
+            }
+
             const hasResponseMeasurements =
               Number.isInteger(entry.response_word_count) &&
               Number.isInteger(entry.response_character_count);
