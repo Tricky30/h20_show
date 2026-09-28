@@ -225,6 +225,11 @@
       const responseStarted = Boolean(findFirst(STOP_BUTTON_SELECTORS));
       const attachmentSubmissionStarted =
         attempt.hadAttachments && responseStarted;
+      const attachmentSubmissionAction =
+        attempt.hadAttachments &&
+        ["send button", "keyboard", "form submission"].includes(
+          attempt.source
+        );
 
       // A new user message is the strongest signal. Composer clearing is the
       // fallback ChatGPT signal for current and virtualized ChatGPT screens.
@@ -232,6 +237,7 @@
         userMessageAppeared ||
         composerWasCleared ||
         attachmentSubmissionStarted ||
+        attachmentSubmissionAction ||
         (responseStarted && composerTextChanged)
       ) {
         this.confirm(attempt);

@@ -12,8 +12,25 @@ function load(file, context) {
 }
 
 async function main() {
+  class FakeElement {
+    constructor(label) {
+      this.label = label;
+      this.parentElement = { textContent: "" };
+    }
+
+    closest() {
+      return this;
+    }
+
+    getAttribute(name) {
+      return name === "aria-label" ? this.label : null;
+    }
+  }
+
   const context = vm.createContext({
     console,
+    Element: FakeElement,
+    document: { querySelectorAll: () => [] },
     createImageBitmap: async () => ({ width: 1920, height: 1080, close() {} })
   });
   load("attachments.js", context);
@@ -33,6 +50,10 @@ async function main() {
     attachments.classifyAttachment({ extension: "bin", mimeType: "" }),
     "other"
   );
+  assert.equal(attachments.isRemovalLabel("Remove photo.png"), true);
+  assert.equal(attachments.isRemovalLabel("remove-file-button"), true);
+  assert.equal(attachments.isRemovalLabel("Add files and more"), false);
+  assert.equal(attachments.isRemovalLabel("Send"), false);
 
   const image = await attachments.metadataFromFile({
     name: "private-photo.JPG",
@@ -83,6 +104,18 @@ async function main() {
   assert.equal(tracker.captureSubmissionSnapshot().records.length, 0);
   assert.equal(submittedAttachments[0].category, "data");
   assert.equal(submittedAttachments[1].category, "document");
+
+  const removalTracker = new attachments.AttachmentTracker();
+  removalTracker.captureFiles([
+    { name: "keep.png", type: "image/png", size: 1 },
+    { name: "remove.png", type: "image/png", size: 2 }
+  ]);
+  removalTracker.handleRemovalClick({
+    target: new FakeElement("Remove remove.png")
+  });
+  const afterRemoval = removalTracker.captureSubmissionSnapshot();
+  assert.equal(afterRemoval.records.length, 1);
+  assert.equal(afterRemoval.records[0].name, "keep.png");
 
   const stored = {};
   const storageContext = vm.createContext({

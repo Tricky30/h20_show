@@ -20,8 +20,6 @@
     "text/tab-separated-values",
     "text/xml"
   ]);
-  const REMOVAL_PATTERN =
-    /(?:remove|delete)[\s_-]+(?:an?[\s_-]+)?(?:file|attachment|image|upload)/i;
   const REMOVAL_SELECTOR = [
     "button[aria-label]",
     "button[title]",
@@ -99,6 +97,10 @@
     ].filter(Boolean).join(" ");
   }
 
+  function isRemovalLabel(value) {
+    return /^(?:remove|delete)(?:\b|[\s_-])/i.test(value || "");
+  }
+
   class AttachmentTracker {
     constructor() {
       this.pending = [];
@@ -167,16 +169,20 @@
     handleRemovalClick(event) {
       if (!(event.target instanceof Element)) return;
       const button = event.target.closest(REMOVAL_SELECTOR);
-      if (!button || !REMOVAL_PATTERN.test(removalLabel(button))) return;
+      if (!button) return;
+      const label = removalLabel(button);
+      if (!isRemovalLabel(label)) return;
 
-      const nearbyText = button.parentElement?.textContent || "";
+      const nearbyText = [label, button.parentElement?.textContent || ""].join(
+        " "
+      );
       let index = this.pending.findIndex(
         (record) => record.name && nearbyText.includes(record.name)
       );
 
       if (index === -1) {
         const removalButtons = Array.from(document.querySelectorAll(REMOVAL_SELECTOR))
-          .filter((candidate) => REMOVAL_PATTERN.test(removalLabel(candidate)));
+          .filter((candidate) => isRemovalLabel(removalLabel(candidate)));
         const buttonIndex = removalButtons.indexOf(button);
         if (removalButtons.length === this.pending.length && buttonIndex >= 0) {
           index = buttonIndex;
@@ -185,7 +191,11 @@
         }
       }
 
-      if (index >= 0) this.pending.splice(index, 1);
+      if (index >= 0) {
+        this.pending.splice(index, 1);
+        console.info("[H2SHOW] Attachment removed");
+        console.info(`[H2SHOW] Attachment count: ${this.pending.length}`);
+      }
     }
 
     captureSubmissionSnapshot() {
@@ -215,6 +225,7 @@
     AttachmentTracker,
     classifyAttachment,
     extensionFromName,
+    isRemovalLabel,
     metadataFromFile
   });
 })();
