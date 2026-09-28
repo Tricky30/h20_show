@@ -2,6 +2,7 @@
   "use strict";
 
   const CONTENT_SELECTORS = [
+    "[class*='MarkdownRoot']",
     ".markdown",
     "[data-message-content]",
     "[class*='markdown']",

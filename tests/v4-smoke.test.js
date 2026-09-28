@@ -95,6 +95,26 @@ async function main() {
     }),
     turnWithoutAuthorRole
   );
+  const currentChatGptAnswer = element(
+    "DIV",
+    {},
+    [element("P", {}, [text("Current response markup")])],
+    ["[class*='MarkdownRoot']"]
+  );
+  assert.equal(
+    context.H2ShowResponseExtractor.findLatestResponseElement({
+      querySelectorAll(selector) {
+        return selector === "[class*='MarkdownRoot']"
+          ? [currentChatGptAnswer]
+          : [];
+      }
+    }),
+    currentChatGptAnswer
+  );
+  assert.equal(
+    context.H2ShowResponseExtractor.extractResponseText(currentChatGptAnswer),
+    "Current response markup"
+  );
 
   const stored = {};
   const storageContext = vm.createContext({
