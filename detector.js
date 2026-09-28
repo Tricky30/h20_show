@@ -67,11 +67,18 @@
     return target.closest(selectors.join(","));
   }
 
+  function sanitizeComposerText(text) {
+    if (typeof text !== "string") return "";
+    // Rich-text editors use U+FFFC as an in-text placeholder for embedded
+    // objects such as attachments. Zero-width spaces may also surround that
+    // placeholder. Neither represents text typed by the user.
+    return text.replace(/\uFFFC/g, "").replace(/\u200B/g, "");
+  }
+
   function getComposerText(composer) {
     if (!composer) return "";
-
     const text = "value" in composer ? composer.value : composer.innerText;
-    return typeof text === "string" ? text : "";
+    return sanitizeComposerText(text);
   }
 
   function composerHasText(composer) {
@@ -275,5 +282,8 @@
     }
   }
 
-  globalThis.H2ShowDetector = Object.freeze({ PromptSubmissionDetector });
+  globalThis.H2ShowDetector = Object.freeze({
+    PromptSubmissionDetector,
+    sanitizeComposerText
+  });
 })();

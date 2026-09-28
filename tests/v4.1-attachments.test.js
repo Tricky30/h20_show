@@ -34,7 +34,13 @@ async function main() {
     createImageBitmap: async () => ({ width: 1920, height: 1080, close() {} })
   });
   load("attachments.js", context);
+  load("detector.js", context);
   const attachments = context.H2ShowAttachments;
+  assert.equal(context.H2ShowDetector.sanitizeComposerText("\uFFFC\u200B"), "");
+  assert.equal(
+    context.H2ShowDetector.sanitizeComposerText("Hello \uFFFCworld 👋"),
+    "Hello world 👋"
+  );
 
   assert.equal(attachments.extensionFromName("private.photo.JPG"), "jpg");
   assert.equal(attachments.extensionFromName("README"), null);
