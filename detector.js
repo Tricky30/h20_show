@@ -72,7 +72,10 @@
     // Rich-text editors use U+FFFC as an in-text placeholder for embedded
     // objects such as attachments. Zero-width spaces may also surround that
     // placeholder. Neither represents text typed by the user.
-    return text.replace(/\uFFFC/g, "").replace(/\u200B/g, "");
+    const sanitized = text
+      .replace(/\uFFFC/g, "")
+      .replace(/[\u200B\u2060\uFEFF]/g, "");
+    return sanitized.trim() ? sanitized : "";
   }
 
   function getComposerText(composer) {

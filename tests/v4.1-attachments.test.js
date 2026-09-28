@@ -38,6 +38,11 @@ async function main() {
   const attachments = context.H2ShowAttachments;
   assert.equal(context.H2ShowDetector.sanitizeComposerText("\uFFFC\u200B"), "");
   assert.equal(
+    context.H2ShowDetector.sanitizeComposerText("\uFFFC\n\u200B"),
+    ""
+  );
+  assert.equal(context.H2ShowDetector.sanitizeComposerText("\n  \t"), "");
+  assert.equal(
     context.H2ShowDetector.sanitizeComposerText("Hello \uFFFCworld 👋"),
     "Hello world 👋"
   );
