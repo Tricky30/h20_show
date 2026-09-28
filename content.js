@@ -16,7 +16,8 @@
 
     const storage = globalThis.H2ShowStorage;
     const { measureText, measurePrompt } = globalThis.H2ShowMeasurements;
-    const { extractResponseText } = globalThis.H2ShowResponseExtractor;
+    const { extractResponseText, findLatestResponseElement } =
+      globalThis.H2ShowResponseExtractor;
     const { PromptActivityUI } = globalThis.H2ShowUI;
     const { PromptSubmissionDetector } = globalThis.H2ShowDetector;
     const { ResponseTracker } = globalThis.H2ShowResponseTracker;
@@ -49,10 +50,27 @@
         }),
       onCompleted: async ({ eventId, responseElement, ...responseFields }) => {
         const fieldsToStore = { ...responseFields };
+        let finalResponseElement = responseElement;
+        let responseText = "";
 
-        if (responseElement) {
+        // ChatGPT can remove its streaming control one DOM update before the
+        // final answer wrapper/content is queryable. Retry briefly so timing
+        // completion and answer extraction do not race each other.
+        for (const delay of [0, 100, 300, 700]) {
+          if (delay) {
+            await new Promise((resolve) => setTimeout(resolve, delay));
+          }
+          finalResponseElement =
+            finalResponseElement || findLatestResponseElement();
+          responseText = finalResponseElement
+            ? extractResponseText(finalResponseElement)
+            : "";
+          if (responseText) break;
+          finalResponseElement = null;
+        }
+
+        if (finalResponseElement) {
           console.info(`[H2SHOW] Response identified for event: ${eventId}`);
-          let responseText = extractResponseText(responseElement);
           if (responseText) {
             const measurements = measureText(responseText);
             responseText = "";
@@ -72,7 +90,7 @@
         }
 
         await updateResponseEvent(eventId, fieldsToStore);
-        if (responseElement) {
+        if (fieldsToStore.response_character_count !== undefined) {
           console.info(
             `[H2SHOW] Event updated with response measurements: ${eventId}`
           );

@@ -281,7 +281,8 @@
           response_completed_at: responseCompletedAt,
           response_duration_ms: duration,
           response_tracking_state: state,
-          responseElement: attempt.responseElement
+          responseElement:
+            attempt.responseElement || assistantMessages().at(-1) || null
         })
       ).catch((error) => {
         console.error("[H2SHOW] Could not save response completion", error);

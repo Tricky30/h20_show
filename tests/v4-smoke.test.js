@@ -75,6 +75,14 @@ async function main() {
     "Heading\n\nHello, world!\n\nFirst item\n\nSecond item\n\nconst x = 1;\n  return x;"
   );
   assert.equal(extracted.includes("Copy"), false);
+  assert.equal(
+    context.H2ShowResponseExtractor.findLatestResponseElement({
+      querySelectorAll(selector) {
+        return selector.includes("data-message-author-role") ? [assistant] : [];
+      }
+    }),
+    assistant
+  );
 
   const stored = {};
   const storageContext = vm.createContext({

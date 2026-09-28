@@ -99,5 +99,23 @@
     return fallbackVisibleText(contentRoot);
   }
 
-  globalThis.H2ShowResponseExtractor = Object.freeze({ extractResponseText });
+  function findLatestResponseElement(root = document) {
+    const assistantMessages = Array.from(
+      root.querySelectorAll?.("[data-message-author-role='assistant']") || []
+    );
+    if (assistantMessages.length) return assistantMessages.at(-1);
+
+    // ChatGPT occasionally changes or delays the author-role wrapper while
+    // keeping the generated answer in a markdown content root. At response
+    // completion, the last such root is the answer for the active prompt.
+    const markdownRoots = Array.from(
+      root.querySelectorAll?.("main .markdown, main [class*='markdown']") || []
+    );
+    return markdownRoots.at(-1) || null;
+  }
+
+  globalThis.H2ShowResponseExtractor = Object.freeze({
+    extractResponseText,
+    findLatestResponseElement
+  });
 })();
