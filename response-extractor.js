@@ -5,7 +5,14 @@
     ".markdown",
     "[data-message-content]",
     "[class*='markdown']",
-    ".prose"
+    ".prose",
+    "[class*='prose']"
+  ];
+  const RESPONSE_CONTAINER_SELECTORS = [
+    "[data-message-author-role='assistant']",
+    "[data-testid^='conversation-turn-']",
+    "main article",
+    "article"
   ];
   const SKIPPED_TAGS = new Set([
     "BUTTON",
@@ -100,18 +107,26 @@
   }
 
   function findLatestResponseElement(root = document) {
-    const assistantMessages = Array.from(
-      root.querySelectorAll?.("[data-message-author-role='assistant']") || []
-    );
-    if (assistantMessages.length) return assistantMessages.at(-1);
+    for (const selector of RESPONSE_CONTAINER_SELECTORS) {
+      const containers = Array.from(root.querySelectorAll?.(selector) || []);
+      for (let index = containers.length - 1; index >= 0; index -= 1) {
+        const container = containers[index];
+        if (CONTENT_SELECTORS.some((contentSelector) =>
+          container.matches?.(contentSelector) ||
+          container.querySelector?.(contentSelector)
+        )) {
+          return container;
+        }
+      }
+    }
 
-    // ChatGPT occasionally changes or delays the author-role wrapper while
-    // keeping the generated answer in a markdown content root. At response
-    // completion, the last such root is the answer for the active prompt.
-    const markdownRoots = Array.from(
-      root.querySelectorAll?.("main .markdown, main [class*='markdown']") || []
-    );
-    return markdownRoots.at(-1) || null;
+    // Some ChatGPT layouts omit a stable turn wrapper. In that case, use the
+    // newest generated-content root itself rather than failing extraction.
+    for (const selector of CONTENT_SELECTORS) {
+      const contentRoots = Array.from(root.querySelectorAll?.(selector) || []);
+      if (contentRoots.length) return contentRoots.at(-1);
+    }
+    return null;
   }
 
   globalThis.H2ShowResponseExtractor = Object.freeze({

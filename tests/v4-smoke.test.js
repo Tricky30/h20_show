@@ -83,6 +83,18 @@ async function main() {
     }),
     assistant
   );
+  const turnWithoutAuthorRole = element("ARTICLE", {}, [answer]);
+  assert.equal(
+    context.H2ShowResponseExtractor.findLatestResponseElement({
+      querySelectorAll(selector) {
+        if (selector === "[data-testid^='conversation-turn-']") {
+          return [turnWithoutAuthorRole];
+        }
+        return [];
+      }
+    }),
+    turnWithoutAuthorRole
+  );
 
   const stored = {};
   const storageContext = vm.createContext({

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "H2SHOW Prompt Activity",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Locally records ChatGPT prompt and response measurements in an on-page activity log.",
   "permissions": [
     "storage"

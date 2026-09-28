@@ -69,6 +69,12 @@
           finalResponseElement = null;
         }
 
+        if (!finalResponseElement) {
+          console.warn(
+            "[H2SHOW] No response content container found after completion"
+          );
+        }
+
         if (finalResponseElement) {
           console.info(`[H2SHOW] Response identified for event: ${eventId}`);
           if (responseText) {
